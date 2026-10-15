@@ -4,7 +4,6 @@ import com.medisense.domain.entity.ManualReviewQueueEntity;
 import com.medisense.domain.repository.ManualReviewQueueRepository;
 import com.medisense.ingestion.exception.DocumentQualityException;
 import com.medisense.ingestion.model.ParsedDocument;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

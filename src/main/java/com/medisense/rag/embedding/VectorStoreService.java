@@ -94,7 +94,7 @@ public class VectorStoreService {
         log.info("Generating batch embeddings for {} child chunks...", childChunks.size());
 
         List<String> texts = childChunks.stream()
-                .map(ChildChunkEntity::getContent)
+                .map(c -> c.getContent())
                 .collect(Collectors.toList());
 
         List<float[]> vectors = embeddingService.generateEmbeddingsBatch(texts);

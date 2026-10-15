@@ -3,7 +3,6 @@ package com.medisense.translation;
 import com.medisense.translation.model.TranslationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
@@ -28,6 +27,7 @@ class SarvamTranslationServiceTest {
     private SarvamTranslationService translationService;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         ProtectedTermsLoader termsLoader = new ProtectedTermsLoader();
         termsLoader.init();

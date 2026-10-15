@@ -30,6 +30,7 @@ class RerankingClientTest {
     private RerankingClient client;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         mockHttpSender = mock(RerankingClient.HttpSender.class);
         mockHttpResponse = mock(HttpResponse.class);

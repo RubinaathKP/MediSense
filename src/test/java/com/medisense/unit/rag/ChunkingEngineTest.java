@@ -4,7 +4,6 @@ import com.medisense.UnitTestBase;
 import com.medisense.domain.enums.EvidenceBasis;
 import com.medisense.fixtures.TestDataBuilder;
 import com.medisense.ingestion.model.DocumentStructure;
-import com.medisense.ingestion.model.NodeLevel;
 import com.medisense.ingestion.model.StructuredNode;
 import com.medisense.rag.chunking.HierarchicalSemanticChunker;
 import com.medisense.rag.chunking.gate.ChunkQualityGate2;
@@ -15,7 +14,6 @@ import com.medisense.rag.chunking.token.TokenCounterStrategy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;

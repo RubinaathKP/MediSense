@@ -34,7 +34,7 @@ public class RerankingOrchestrator {
                 .toList();
 
         Map<UUID, ScoredChunk> chunkMap = candidates.stream()
-                .collect(Collectors.toMap(ScoredChunk::chunkId, Function.identity(), (existing, replacement) -> existing));
+                .collect(Collectors.toMap(c -> c.chunkId(), Function.identity(), (existing, replacement) -> existing));
 
         List<PassageDto> passageDtos = candidates.stream()
                 .map(c -> new PassageDto(c.chunkId().toString(), c.content()))

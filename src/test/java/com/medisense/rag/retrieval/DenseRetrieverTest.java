@@ -36,6 +36,7 @@ class DenseRetrieverTest {
 
     @Test
     @DisplayName("Should build parameterized SQL with active status, evidence filter, domain tags, and vector distance")
+    @SuppressWarnings("unchecked")
     void testRetrieveDenseWithAllFilters() {
         float[] queryVector = new float[]{0.1f, 0.2f, 0.3f};
         List<String> domainTags = List.of("CARDIOLOGY", "HYPERTENSION");
@@ -43,11 +44,7 @@ class DenseRetrieverTest {
 
         UUID chunkId = UUID.randomUUID();
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
-                .thenAnswer(invocation -> {
-                    RowMapper<ScoredChunk> mapper = invocation.getArgument(1);
-                    // verify row mapper works if invoked
-                    return List.of(new ScoredChunk(chunkId, "Guideline Section", "Clinical content", 0.92, 1, "DENSE"));
-                });
+                .thenAnswer(invocation -> List.of(new ScoredChunk(chunkId, "Guideline Section", "Clinical content", 0.92, 1, "DENSE")));
 
         List<ScoredChunk> results = denseRetriever.retrieveDense(queryVector, domainTags, evidenceFilter, 20);
 
@@ -77,6 +74,7 @@ class DenseRetrieverTest {
 
     @Test
     @DisplayName("Should omit evidence and domain filters when not provided")
+    @SuppressWarnings("unchecked")
     void testRetrieveDenseWithoutFilters() {
         float[] queryVector = new float[]{0.5f, 0.6f};
 

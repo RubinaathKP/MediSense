@@ -5,7 +5,6 @@ import com.medisense.api.dto.ReportDtos.*;
 import com.medisense.api.exception.FileTooLargeException;
 import com.medisense.api.exception.InvalidFileTypeException;
 import com.medisense.api.exception.SessionNotFoundException;
-import com.medisense.domain.entity.SessionEntity;
 import com.medisense.domain.repository.SessionRepository;
 import com.medisense.ingestion.PdfParserService;
 import com.medisense.ingestion.exception.DocumentQualityException;

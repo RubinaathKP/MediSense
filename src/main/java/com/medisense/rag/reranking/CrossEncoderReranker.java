@@ -40,7 +40,7 @@ public class CrossEncoderReranker {
         List<RerankedChunk> reranked = rerankingOrchestrator.rerankChunks(query, syntheticChunks);
         return reranked.stream()
                 .limit(topN)
-                .map(RerankedChunk::content)
+                .map(c -> c.content())
                 .collect(Collectors.toList());
     }
 

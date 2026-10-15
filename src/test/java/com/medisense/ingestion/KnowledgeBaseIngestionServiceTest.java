@@ -1,6 +1,5 @@
 package com.medisense.ingestion;
 
-import com.medisense.domain.entity.ChildChunkEntity;
 import com.medisense.domain.entity.ParentChunkEntity;
 import com.medisense.domain.entity.SourceDocumentEntity;
 import com.medisense.domain.enums.EvidenceBasis;

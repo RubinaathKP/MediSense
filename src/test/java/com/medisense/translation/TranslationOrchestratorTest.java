@@ -5,7 +5,6 @@ import com.medisense.translation.indictrans2.model.IndicTrans2Response;
 import com.medisense.translation.model.TranslationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;

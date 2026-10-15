@@ -1,7 +1,6 @@
 package com.medisense.unit.ingestion.parser;
 
 import com.medisense.UnitTestBase;
-import com.medisense.fixtures.AssertionHelpers;
 import com.medisense.ingestion.FormatParserService;
 import com.medisense.ingestion.exception.DocumentParsingException;
 import com.medisense.ingestion.model.ParsedDocument;

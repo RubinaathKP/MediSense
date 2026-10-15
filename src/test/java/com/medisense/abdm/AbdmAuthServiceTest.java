@@ -2,8 +2,6 @@ package com.medisense.abdm;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
-import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
@@ -25,6 +23,7 @@ class AbdmAuthServiceTest {
     private AbdmAuthService authService;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         redisTemplate = mock(StringRedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
@@ -48,6 +47,7 @@ class AbdmAuthServiceTest {
     }
 
     @Test
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     void testGetValidAccessTokenFetchesNewTokenWhenCacheEmpty() {
         when(valueOperations.get("abdm:gateway:access_token")).thenReturn(null);
 

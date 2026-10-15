@@ -27,7 +27,6 @@ public class ProtectedTermsLoader {
         reloadTerms();
     }
 
-    @SuppressWarnings("unchecked")
     public synchronized void reloadTerms() {
         String fileName = (termsFileName != null && !termsFileName.isBlank()) ? termsFileName : "protected_terms.yaml";
         log.info("Loading protected medical terms from {}", fileName);

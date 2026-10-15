@@ -79,7 +79,7 @@ public class DenseRetriever {
         if (domainTags != null && !domainTags.isEmpty()) {
             List<String> cleanedTags = domainTags.stream()
                     .filter(t -> t != null && !t.isBlank())
-                    .map(String::trim)
+                    .map(t -> t.trim())
                     .toList();
             if (!cleanedTags.isEmpty()) {
                 sql.append("AND c.metadata->'domain_tags' ?| string_to_array(?, ',') ");

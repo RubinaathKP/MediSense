@@ -27,7 +27,6 @@ class LLMProviderResilienceTest {
     private GeminiProvider geminiProvider;
     private OllamaProvider.HttpSender mockOllamaHttpSender;
     private OllamaProvider ollamaProvider;
-    private GeminiCircuitBreaker circuitBreaker;
     private ObjectMapper objectMapper;
 
     @BeforeEach
@@ -38,8 +37,6 @@ class LLMProviderResilienceTest {
         objectMapper = new ObjectMapper();
         mockOllamaHttpSender = mock(OllamaProvider.HttpSender.class);
         ollamaProvider = new OllamaProvider("http://localhost:11434/api/generate", objectMapper, mockOllamaHttpSender);
-
-        circuitBreaker = new GeminiCircuitBreaker();
     }
 
     @Test
@@ -61,6 +58,7 @@ class LLMProviderResilienceTest {
 
     @Test
     @DisplayName("Verify Automatic Fallback from Gemini to Ollama on Gemini Failure")
+    @SuppressWarnings("unchecked")
     void testFallbackFromGeminiToOllamaOnFailure() throws Exception {
         // Gemini fails
         when(mockChatLanguageModel.generate(anyString())).thenThrow(new RuntimeException("Gemini API Rate Limit / Timeout"));

@@ -18,7 +18,6 @@ import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,9 +39,6 @@ class EvalSetRunnerIntegrationTest {
 
         LanguageDetectorService languageDetector = new LanguageDetectorService();
 
-        ProtectedTermsLoader termsLoader = new ProtectedTermsLoader();
-        termsLoader.init();
-        NumericValueProtector protector = new NumericValueProtector(termsLoader, null);
         TranslationOrchestrator translationOrchestrator = mock(TranslationOrchestrator.class);
         when(translationOrchestrator.translateToTamil(anyString()))
                 .thenReturn(TranslationResult.success("mock translated text", "orig", "en", "ta"));

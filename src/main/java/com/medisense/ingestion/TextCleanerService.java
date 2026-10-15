@@ -92,7 +92,7 @@ public class TextCleanerService {
                 .build();
     }
 
-    private String expandAbbreviations(String text) {
+    public String expandAbbreviations(String text) {
         String result = text;
         for (Map.Entry<String, String> entry : abbreviationMap.entrySet()) {
             // Replace whole word abbreviations (e.g. \bNCD\b)

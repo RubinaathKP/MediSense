@@ -14,6 +14,7 @@ public class HybridRetrieverService {
 
     private static final Logger log = LoggerFactory.getLogger(HybridRetrieverService.class);
 
+    @SuppressWarnings("unused")
     private final DenseRetriever denseRetriever;
     private final SparseBm25Retriever sparseRetriever;
     private final RetrievalOrchestrator retrievalOrchestrator;

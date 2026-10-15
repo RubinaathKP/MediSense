@@ -1,13 +1,9 @@
 package com.medisense.fixtures;
 
 import com.medisense.api.dto.QueryDtos.QueryResponse;
-import com.medisense.domain.enums.SafetyDecision;
-import com.medisense.ingestion.model.CleanedDocument;
-import com.medisense.ingestion.model.ParsedDocument;
 import com.medisense.safety.CitationVerifier.CitationVerificationResult;
 import com.medisense.safety.InputSafetyClassifier.DetailedClassificationResult;
 import com.medisense.safety.OutputSafetyFilter.OutputFilterResult;
-import com.medisense.safety.SafeRefusalResponse;
 import org.assertj.core.api.AbstractAssert;
 import org.assertj.core.api.Assertions;
 

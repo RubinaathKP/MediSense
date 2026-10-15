@@ -26,7 +26,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -100,13 +99,6 @@ class ReportControllerUnitTest extends UnitTestBase {
                 "file", "blood_report.pdf", "application/pdf", validPdfBytes
         );
 
-        ParsedDocument parsedDoc = ParsedDocument.builder()
-                .documentName("blood_report.pdf")
-                .rawText("Hemoglobin 14.2 g/dL")
-                .extractionConfidence(0.95)
-                .tokenCount(10)
-                .metadata(Collections.emptyMap())
-                .build();
 
         when(pdfParserService.extractTextFromPdf(any(InputStream.class)))
                 .thenReturn("Hemoglobin 14.2 g/dL - Comprehensive lab test report with sufficient length");

@@ -1,7 +1,5 @@
 package com.medisense.unit.rag;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.medisense.domain.enums.EvidenceBasis;
 import com.medisense.rag.retrieval.DenseRetriever;
 import com.medisense.rag.retrieval.model.ScoredChunk;
 import com.medisense.testcontainers.PostgresTestContainer;
@@ -133,7 +131,6 @@ class DenseRetrieverTest {
         lenient().when(mockJdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class)))
                 .thenAnswer(inv -> {
                     String sql = inv.getArgument(0);
-                    RowMapper<ScoredChunk> mapper = inv.getArgument(1);
                     Object[] params;
                     Object arg2 = inv.getArgument(2);
                     if (arg2 instanceof Object[] arr) {
@@ -165,7 +162,7 @@ class DenseRetrieverTest {
                     final List<String> finalDomains = domainFilter;
 
                     List<ScoredChunk> list = corpus10Chunks.stream()
-                            .filter(TestChunkRecord::isActive)
+                            .filter(c -> c.isActive())
                             .filter(c -> {
                                 if (finalEvidence != null) {
                                     return finalEvidence.equalsIgnoreCase(c.evidenceBasis());
@@ -241,7 +238,7 @@ class DenseRetrieverTest {
 
         Set<UUID> clinicalTrialIds = corpus10Chunks.stream()
                 .filter(c -> "clinical_trial".equals(c.evidenceBasis()))
-                .map(TestChunkRecord::id)
+                .map(c -> c.id())
                 .collect(Collectors.toSet());
 
         for (ScoredChunk chunk : results) {
@@ -262,7 +259,7 @@ class DenseRetrieverTest {
 
         Set<UUID> lipidTagIds = corpus10Chunks.stream()
                 .filter(c -> c.domainTags().contains("lipid_management") && c.isActive())
-                .map(TestChunkRecord::id)
+                .map(c -> c.id())
                 .collect(Collectors.toSet());
 
         for (ScoredChunk chunk : results) {
@@ -284,10 +281,10 @@ class DenseRetrieverTest {
         assertThat(results).isNotEmpty();
 
         Set<UUID> validChunkIds = corpus10Chunks.stream()
-                .filter(TestChunkRecord::isActive)
+                .filter(c -> c.isActive())
                 .filter(c -> "clinical_trial".equals(c.evidenceBasis()))
                 .filter(c -> c.domainTags().contains("lipid_management"))
-                .map(TestChunkRecord::id)
+                .map(c -> c.id())
                 .collect(Collectors.toSet());
 
         for (ScoredChunk chunk : results) {

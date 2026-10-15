@@ -140,10 +140,10 @@ public class SarvamTranslationService {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                log.info("Calling Sarvam-Translate API (attempt {}/{}): url={}", attempt, maxAttempts, url);
+                @SuppressWarnings("rawtypes")
                 ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
                 if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                    Map body = response.getBody();
+                    Map<?, ?> body = response.getBody();
                     if (body.containsKey("translated_text")) {
                         return (String) body.get("translated_text");
                     }

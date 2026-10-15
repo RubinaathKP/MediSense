@@ -20,15 +20,11 @@ import com.medisense.ingestion.PrescriptiveContentDetectorService;
 import com.medisense.ingestion.QualityGate1Service;
 import com.medisense.ingestion.StructureExtractorService;
 import com.medisense.ingestion.TextCleanerService;
-import com.medisense.ingestion.exception.DocumentQualityException;
 import com.medisense.ingestion.model.DocumentStructure;
 import com.medisense.ingestion.model.IngestionResult;
 import com.medisense.ingestion.model.StructuredNode;
 import com.medisense.rag.chunking.HierarchicalSemanticChunker;
 import com.medisense.rag.chunking.gate.ChunkQualityGate2;
-import com.medisense.rag.chunking.model.ChildChunk;
-import com.medisense.rag.chunking.model.ChunkPair;
-import com.medisense.rag.chunking.model.ParentChunk;
 import com.medisense.rag.chunking.tagger.DomainTagger;
 import com.medisense.rag.chunking.token.TokenCounterStrategy;
 import com.medisense.rag.embedding.EmbeddingService;
@@ -41,11 +37,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -160,7 +153,7 @@ class IngestionOrchestratorTest extends UnitTestBase {
 
         lenient().doAnswer(inv -> {
             List<?> batch = inv.getArgument(0);
-            for (Object item : batch) {
+            for (int i = 0; i < batch.size(); i++) {
                 ChildChunkEntity entity = TestDataBuilder.aChildChunk().build();
                 storedChildChunks.add(entity);
             }

@@ -39,7 +39,7 @@ public class ParentChunkFetcher {
         }
 
         List<UUID> chunkIds = topChildChunks.stream()
-                .map(ScoredChunk::chunkId)
+                .map(c -> c.chunkId())
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
@@ -99,7 +99,7 @@ public class ParentChunkFetcher {
         }
 
         List<RetrievedContext> contexts = orderedParentMap.values().stream()
-                .map(RetrievedContextBuilder::build)
+                .map(b -> b.build())
                 .collect(Collectors.toList());
 
         log.info("Successfully fetched {} unique parent contexts for {} child chunks.",

@@ -22,6 +22,7 @@ class DlqRetryJobTest {
     private AuditLogService auditLogService;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         auditLogRepository = mock(AuditLogRepository.class);
         redisTemplate = mock(StringRedisTemplate.class);

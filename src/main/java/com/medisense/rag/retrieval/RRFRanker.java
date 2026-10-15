@@ -55,7 +55,7 @@ public class RRFRanker {
             ScoredChunk c = safeDense.get(i);
             if (c == null || c.chunkId() == null) continue;
             int rank = (c.rank() > 0) ? c.rank() : (i + 1);
-            denseRankMap.merge(c.chunkId(), rank, Math::min);
+            denseRankMap.merge(c.chunkId(), rank, (r1, r2) -> Math.min(r1, r2));
             chunkDataMap.putIfAbsent(c.chunkId(), c);
         }
 
@@ -64,7 +64,7 @@ public class RRFRanker {
             ScoredChunk c = safeSparse.get(i);
             if (c == null || c.chunkId() == null) continue;
             int rank = (c.rank() > 0) ? c.rank() : (i + 1);
-            sparseRankMap.merge(c.chunkId(), rank, Math::min);
+            sparseRankMap.merge(c.chunkId(), rank, (r1, r2) -> Math.min(r1, r2));
             chunkDataMap.putIfAbsent(c.chunkId(), c);
         }
 

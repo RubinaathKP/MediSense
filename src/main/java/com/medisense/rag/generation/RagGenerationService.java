@@ -13,6 +13,7 @@ public class RagGenerationService {
     private static final Logger log = LoggerFactory.getLogger(RagGenerationService.class);
 
     private final GenerationOrchestrator generationOrchestrator;
+    @SuppressWarnings("unused")
     private final PromptAssembler promptAssembler;
 
     public RagGenerationService(GenerationOrchestrator generationOrchestrator, PromptAssembler promptAssembler) {

@@ -5,7 +5,6 @@ import com.medisense.domain.entity.AuditLogEntity;
 import com.medisense.domain.repository.AuditLogRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -23,6 +22,7 @@ class AuditLogServiceTest {
     private ListOperations<String, String> listOperations;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         auditLogRepository = mock(AuditLogRepository.class);
         redisTemplate = mock(StringRedisTemplate.class);

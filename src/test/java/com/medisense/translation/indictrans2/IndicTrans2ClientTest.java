@@ -34,6 +34,7 @@ class IndicTrans2ClientTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void testTranslateSuccessWithHttp200() throws Exception {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(200);
@@ -49,6 +50,7 @@ class IndicTrans2ClientTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void testTranslateCircuitBreakerOpensAfterThreeFailures() throws Exception {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(500);

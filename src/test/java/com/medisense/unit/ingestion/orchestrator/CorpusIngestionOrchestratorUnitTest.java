@@ -12,7 +12,6 @@ import com.medisense.ingestion.CorpusIngestionOrchestrator;
 import com.medisense.ingestion.DocumentIngestionPipeline;
 import com.medisense.ingestion.model.IngestionResult;
 import com.medisense.rag.chunking.HierarchicalSemanticChunker;
-import com.medisense.rag.chunking.model.ChunkPair;
 import com.medisense.rag.embedding.EmbeddingService;
 import com.medisense.rag.embedding.VectorStoreService;
 import com.medisense.rag.retrieval.LuceneIndexService;
@@ -23,7 +22,6 @@ import org.mockito.Mock;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 

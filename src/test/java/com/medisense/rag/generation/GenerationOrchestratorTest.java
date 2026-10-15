@@ -89,6 +89,7 @@ class GenerationOrchestratorTest {
 
     @Test
     @DisplayName("End-to-End Fallback to Ollama when Gemini Fails")
+    @SuppressWarnings("unchecked")
     void testFallbackToOllamaWhenGeminiFails() throws Exception {
         when(mockChatLanguageModel.generate(anyString())).thenThrow(new RuntimeException("Gemini API Error"));
 
