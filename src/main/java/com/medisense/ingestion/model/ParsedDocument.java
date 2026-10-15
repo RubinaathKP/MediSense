@@ -63,9 +63,12 @@ public class ParsedDocument {
         public Builder extractedTablesJson(List<String> extractedTablesJson) { this.extractedTablesJson = extractedTablesJson; return this; }
         public Builder extractionConfidence(double extractionConfidence) { this.extractionConfidence = extractionConfidence; return this; }
         public Builder tokenCount(int tokenCount) { this.tokenCount = tokenCount; return this; }
-        public Builder metadata(java.util.Map<?, ?> metadata) { 
-            this.metadata = metadata != null ? new java.util.HashMap(metadata) : new java.util.HashMap<>(); 
-            return this; 
+        public Builder metadata(java.util.Map<?, ?> metadata) {
+            this.metadata = new java.util.HashMap<>();
+            if (metadata != null) {
+                metadata.forEach((k, v) -> this.metadata.put(String.valueOf(k), v));
+            }
+            return this;
         }
 
         public ParsedDocument build() {

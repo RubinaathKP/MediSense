@@ -1,6 +1,5 @@
 package com.medisense.rag.retrieval;
 
-import com.medisense.domain.entity.ChildChunkEntity;
 import com.medisense.rag.retrieval.model.RetrievedContext;
 import com.medisense.rag.retrieval.model.ScoredChunk;
 import org.slf4j.Logger;

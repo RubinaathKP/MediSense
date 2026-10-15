@@ -59,11 +59,11 @@ class HealthClaimVerificationE2ETest extends E2ETestBase {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         ClaimResponse body = response.getBody();
         assertThat(body).isNotNull();
-        assertThat(body.claim_text()).contains("bitter gourd juice");
-        assertThat(body.allopathic_position()).isNotNull();
-        assertThat(body.traditional_position()).isNotNull();
-        assertThat(body.allopathic_position().summary()).contains("Clinical trial evidence");
-        assertThat(body.traditional_position().summary()).contains("Ayurveda");
+        assertThat(body.claim_assessment()).isNotNull();
+        assertThat(body.claim_assessment().allopathic_position()).isNotNull();
+        assertThat(body.claim_assessment().traditional_position()).isNotNull();
+        assertThat(body.claim_assessment().allopathic_position().summary()).contains("Clinical trial evidence");
+        assertThat(body.claim_assessment().traditional_position().summary()).contains("Ayurveda");
     }
 
     @Test
@@ -91,6 +91,6 @@ class HealthClaimVerificationE2ETest extends E2ETestBase {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         ClaimResponse body = response.getBody();
         assertThat(body).isNotNull();
-        assertThat(body.allopathic_position().summary()).isNotBlank();
+        assertThat(body.claim_assessment().allopathic_position().summary()).isNotBlank();
     }
 }

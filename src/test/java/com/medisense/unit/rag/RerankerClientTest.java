@@ -152,7 +152,7 @@ class RerankerClientTest extends UnitTestBase {
                         .withBody("{\"results\":[]}")));
 
         // Configure client with 1s timeout and 0 retries to verify timeout handling within 5s test limit
-        RerankerClient timeoutClient = new RerankingClient(
+        RerankingClient timeoutClient = new RerankingClient(
                 "http://localhost:" + wireMockServer.port() + "/rerank",
                 circuitBreaker,
                 objectMapper,

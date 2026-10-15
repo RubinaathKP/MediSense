@@ -262,7 +262,7 @@ public class TestDataBuilder {
         private UUID id = UUID.randomUUID();
         private SessionEntity session = aSession().build();
         private String rawQuery = "what does borderline LDL mean for my heart?";
-        private QueryCategory category = QueryCategory.LAB_EXPLANATION;
+        private QueryCategory category = QueryCategory.REPORT_EXPLANATION;
         private String detectedLanguage = "en";
 
         public QueryRecordBuilder id(UUID id) { this.id = id; return this; }
