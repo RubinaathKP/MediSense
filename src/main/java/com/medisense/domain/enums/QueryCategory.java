@@ -1,0 +1,9 @@
+package com.medisense.domain.enums;
+
+public enum QueryCategory {
+    REPORT_EXPLANATION,
+    PRESCRIPTION_UNDERSTANDING,
+    HEALTH_CLAIM_VERIFICATION,
+    PRESCRIPTIVE_REFUSAL,
+    EMERGENCY_REFUSAL
+}

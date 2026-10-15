@@ -1,0 +1,84 @@
+# Implementation Plan: MediSense RAG Generation Pipeline
+
+Build a provider-agnostic, structured RAG Generation Pipeline in `com.medisense.rag.generation` featuring system prompt enforcement, structured context assembly, dual LLM provider support (Gemini + local Ollama fallback), circuit breaker resilience, and robust JSON parsing.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Generation Architecture**:
+> - **PromptAssembler**: Builds system instruction, retrieved context tags (`[Context N - Source: X Y]`), patient structured lab/prescription data, user query, and language instructions (Tamil non-translation notes for drug/numeric fields).
+> - **System Prompt**: Hardcoded, version-controlled string enforcing: (1) Answer ONLY from context, (2) return `INSUFFICIENT_CONTEXT` when unanswerable, (3) no prescriptions/diagnoses, (4) no dosage/interaction mentions, (5) `[Source: X]` tags, (6) JSON output schema.
+> - **LLM Providers & Resiliency**:
+>   - `GeminiProvider`: Primary provider (Temperature 0.1, 1000 max tokens, 10s timeout).
+>   - `OllamaProvider`: Secondary fallback provider (`mistral:7b-instruct-q4_K_M`, Temperature 0.1, 30s timeout).
+>   - `GeminiCircuitBreaker`: 3 failures in 60s -> opens circuit for 5 minutes (300,000 ms), bypassing Gemini to Ollama.
+> - **ResponseParser**: Markdown fence stripping (````json ... ````), `INSUFFICIENT_CONTEXT` handling, JSON validation, and parse failure fallbacks.
+> - **GenerationOrchestrator**: Coordinates Assembly -> Execution -> Parsing -> Delivery.
+
+## Proposed Changes
+
+---
+
+### Models & Interfaces (`com.medisense.rag.generation.model`)
+
+#### [NEW] [MediSenseResponse.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/model/MediSenseResponse.java)
+- Record: `(String explanationText, List<CitationDto> citations, boolean isReferral, String languageOut, boolean insufficientContext)`.
+
+#### [NEW] [CitationDto.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/model/CitationDto.java)
+- Record: `(String chunkId, String sourceName, Integer sourceYear, String evidenceBasis)`.
+
+#### [NEW] [AssembledPrompt.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/model/AssembledPrompt.java)
+- Record: `(String systemInstruction, String userContent, String fullPromptText, String targetLanguage)`.
+
+#### [NEW] [GenerationResult.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/model/GenerationResult.java)
+- Record: `(String rawOutput, String providerName, double temperature, int maxTokens, boolean isSuccess, String errorMessage)`.
+
+---
+
+### Core Pipeline Components (`com.medisense.rag.generation`)
+
+#### [NEW] [SystemPromptConstants.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/SystemPromptConstants.java)
+- Version-controlled system prompt constant enforcing all 6 critical RAG guardrails.
+
+#### [MODIFY] [PromptAssembler.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/PromptAssembler.java)
+- Assembles system prompt, labeled parent contexts, structured patient lab/prescription data, user query, and Tamil translation rules.
+
+#### [NEW] [LLMProviderService.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/provider/LLMProviderService.java)
+- Interface for LLM execution: `GenerationResult generate(AssembledPrompt prompt)`.
+
+#### [NEW] [GeminiProvider.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/provider/GeminiProvider.java)
+- Gemini 1.5 Pro implementation (Temp 0.1, 1000 max tokens, 10s timeout).
+
+#### [NEW] [OllamaProvider.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/provider/OllamaProvider.java)
+- Local Ollama implementation (`mistral:7b-instruct-q4_K_M`, Temp 0.1, 30s timeout).
+
+#### [NEW] [GeminiCircuitBreaker.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/resilience/GeminiCircuitBreaker.java)
+- Opens for 5 minutes after 3 failures within 60 seconds.
+
+#### [NEW] [ResponseParser.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/ResponseParser.java)
+- Markdown fence stripper, JSON parser, `INSUFFICIENT_CONTEXT` fallback, and parse error handler.
+
+#### [MODIFY] [RagGenerationService.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/RagGenerationService.java) / [GenerationOrchestrator.java](file:///e:/agent/src/main/java/com/medisense/rag/generation/GenerationOrchestrator.java)
+- Orchestrates the full generation pipeline.
+
+---
+
+### Automated Tests (`src/test/java/com/medisense/rag/generation/`)
+
+#### [NEW] [PromptAssemblerTest.java](file:///e:/agent/src/test/java/com/medisense/rag/generation/PromptAssemblerTest.java)
+- Verifies system prompt inclusion, labeled context injection, structured patient data, and Tamil translation instructions.
+
+#### [NEW] [ResponseParserTest.java](file:///e:/agent/src/test/java/com/medisense/rag/generation/ResponseParserTest.java)
+- Verifies markdown code fence stripping, `INSUFFICIENT_CONTEXT` detection, and JSON parse failure fallback.
+
+#### [NEW] [LLMProviderResilienceTest.java](file:///e:/agent/src/test/java/com/medisense/rag/generation/LLMProviderResilienceTest.java)
+- Verifies temperature 0.1 configuration, Gemini timeout/error fallback to Ollama, and Gemini circuit breaker state transitions (3 failures -> 5 min open).
+
+#### [NEW] [GenerationOrchestratorTest.java](file:///e:/agent/src/test/java/com/medisense/rag/generation/GenerationOrchestratorTest.java)
+- Verifies end-to-end generation orchestration.
+
+## Verification Plan
+
+### Automated Tests
+- Run `mvn test "-Dtest=PromptAssemblerTest,ResponseParserTest,LLMProviderResilienceTest,GenerationOrchestratorTest"`
+- Run full build to ensure 100% compilation and test pass rate.

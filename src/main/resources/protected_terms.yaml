@@ -1,0 +1,37 @@
+# MediSense Protected Medical Terms & Units Configuration
+# Terms listed here will be protected with placeholders before sending text to translation APIs.
+
+lab_tests:
+  - "LDL Cholesterol"
+  - "HDL Cholesterol"
+  - "Total Cholesterol"
+  - "Serum Creatinine"
+  - "Fastings Blood Sugar"
+  - "Postprandial Blood Sugar"
+  - "HbA1c"
+  - "Triglycerides"
+  - "Blood Urea Nitrogen"
+  - "Serum Potassium"
+  - "Serum Sodium"
+  - "Bilirubin"
+  - "SGOT"
+  - "SGPT"
+  - "TSH"
+  - "Thyroxine"
+  - "Platelet Count"
+  - "White Blood Cell Count"
+  - "Red Blood Cell Count"
+
+drug_classes:
+  - "Statins"
+  - "ACE Inhibitors"
+  - "Beta Blockers"
+  - "Biguanides"
+  - "ARBs"
+  - "Calcium Channel Blockers"
+  - "Diuretics"
+  - "Sulfonylureas"
+  - "SGLT2 Inhibitors"
+  - "DPP-4 Inhibitors"
+  - "Antiplatelets"
+  - "Anticoagulants"

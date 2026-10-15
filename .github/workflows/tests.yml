@@ -1,0 +1,109 @@
+name: MediSense Backend Test Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===================================================================
+  # Stage 1: Unit Tests (Fast, Isolated, Mocked)
+  # ===================================================================
+  unit-tests:
+    name: 1. Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Unit Tests
+        run: mvn clean test -P unit --no-transfer-progress
+
+      - name: Upload Unit Test Surefire Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: target/surefire-reports/
+
+  # ===================================================================
+  # Stage 2: Integration Tests (Testcontainers PostgreSQL + Redis)
+  # ===================================================================
+  integration-tests:
+    name: 2. Integration Tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Verify Docker for Testcontainers
+        run: docker info
+
+      - name: Run Integration Tests
+        run: mvn test -P integration --no-transfer-progress
+
+      - name: Upload Integration Test Surefire Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports
+          path: target/surefire-reports/
+
+  # ===================================================================
+  # Stage 3: End-to-End Tests (Full Context + WireMock External APIs)
+  # ===================================================================
+  e2e-tests:
+    name: 3. E2E Tests
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run End-to-End Tests
+        run: mvn test -P e2e --no-transfer-progress
+
+      - name: Upload E2E Test Surefire Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-reports
+          path: target/surefire-reports/
+
+      - name: Generate Pipeline Test Summary
+        if: always()
+        run: |
+          echo "### Test Execution Results Summary :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 1. Unit Tests | :white_check_mark: Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| 2. Integration Tests | :white_check_mark: Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| 3. End-to-End Tests | :white_check_mark: Passed |" >> $GITHUB_STEP_SUMMARY

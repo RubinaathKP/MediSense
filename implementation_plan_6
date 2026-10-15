@@ -1,0 +1,90 @@
+# Implementation Plan: BAAI/bge-reranker-v2-m3 Cross-Encoder Reranking Layer
+
+Implement a production-grade, resilient Cross-Encoder Reranking layer for MediSense RAG pipeline using `BAAI/bge-reranker-v2-m3`. The architecture consists of a Java `RerankingClient` and `RerankingOrchestrator` interfacing over HTTP with a Python FastAPI microservice (`reranker-service`), featuring built-in retries, 3s timeout, circuit breaker, and automatic RRF fallback.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Architecture Overview**:
+> - **Java Side (`com.medisense.rag.reranking`)**: `RerankingClient`, `RerankingOrchestrator`, `RerankerCircuitBreaker`, and DTOs (`RerankRequest`, `RerankResponse`, `RerankedChunk`).
+> - **Python Side (`reranker-service/`)**: FastAPI app loading `BAAI/bge-reranker-v2-m3` via `FlagEmbedding` / `FlagReranker`, listening on port 8001.
+> - **Docker & Compose**: Dockerfile in `reranker-service/Dockerfile` and addition of `reranker-service` in `docker-compose.yml`.
+
+## Proposed Changes
+
+---
+
+### Python Reranker Microservice
+
+#### [NEW] [main.py](file:///e:/agent/reranker-service/main.py)
+- FastAPI application loading `FlagReranker('BAAI/bge-reranker-v2-m3', use_fp16=True)`.
+- `POST /rerank`: accepts query, list of passages (`chunk_id`, `text`), and `top_k`.
+- Batch scores passages using `reranker.compute_score([[query, passage.text] for passage in request.passages])`.
+- Returns top-k passages sorted descending by cross-encoder score.
+- `GET /health`: health check endpoint.
+
+#### [NEW] [requirements.txt](file:///e:/agent/reranker-service/requirements.txt)
+- Dependencies: `fastapi`, `uvicorn[standard]`, `pydantic`, `FlagEmbedding`, `torch`, `transformers`.
+
+#### [NEW] [Dockerfile](file:///e:/agent/reranker-service/Dockerfile)
+- Python 3.10-slim base image, dependency installation, and Uvicorn server startup on port 8001.
+
+---
+
+### Docker Infrastructure
+
+#### [MODIFY] [docker-compose.yml](file:///e:/agent/docker-compose.yml)
+- Add `reranker-service` container definition with port mapping `8001:8001` and health check (`http://localhost:8001/health`).
+
+---
+
+### Java Backend (`com.medisense.rag.reranking`)
+
+#### [NEW] [RerankedChunk.java](file:///e:/agent/src/main/java/com/medisense/rag/reranking/model/RerankedChunk.java)
+- Immutable Record representing reranked chunks: `(UUID chunkId, String sectionHeading, String content, double score, int rank, String source, boolean isReranked)`.
+
+#### [NEW] [RerankRequest.java](file:///e:/agent/src/main/java/com/medisense/rag/reranking/model/RerankRequest.java)
+- Request DTO matching Python endpoint schema: `(String query, List<PassageDto> passages, int topK)`.
+
+#### [NEW] [RerankResponse.java](file:///e:/agent/src/main/java/com/medisense/rag/reranking/model/RerankResponse.java)
+- Response DTO matching Python endpoint response: `(List<RerankResultDto> results)`.
+
+#### [NEW] [RerankerCircuitBreaker.java](file:///e:/agent/src/main/java/com/medisense/rag/reranking/RerankerCircuitBreaker.java)
+- Manages state (CLOSED, OPEN).
+- Counts consecutive failures. After 3 failures, transitions state to OPEN for 60 seconds.
+- Automatically resets state to CLOSED after half-open test / failure window expiration.
+
+#### [NEW] [RerankingClient.java](file:///e:/agent/src/main/java/com/medisense/rag/reranking/RerankingClient.java)
+- Spring `@Service` using `java.net.http.HttpClient` or `RestClient` with a 3-second connect/read timeout.
+- Implements 2 retries with 500ms delay on failure.
+- Integrates `RerankerCircuitBreaker`. If open or calls fail after retries, throws a controlled `RerankerUnavailableException`.
+
+#### [MODIFY] [CrossEncoderReranker.java](file:///e:/agent/src/main/java/com/medisense/rag/reranking/CrossEncoderReranker.java)
+- Replace stub with delegating calls to `RerankingOrchestrator`.
+
+#### [NEW] [RerankingOrchestrator.java](file:///e:/agent/src/main/java/com/medisense/rag/reranking/RerankingOrchestrator.java)
+- Receives query and `List<ScoredChunk>` (up to 20 items).
+- Invokes `RerankingClient`.
+- Maps returned cross-encoder scores back to `ScoredChunk` by `chunk_id`.
+- On success: returns top-5 `RerankedChunk` objects with `isReranked = true`.
+- On fallback (`RerankerUnavailableException` or error): logs warning, selects top-5 from input RRF `ScoredChunk` list, and returns them as `RerankedChunk` with `isReranked = false`.
+
+---
+
+### Unit & Integration Testing
+
+#### [NEW] [RerankingClientTest.java](file:///e:/agent/src/test/java/com/medisense/rag/reranking/RerankingClientTest.java)
+- Mock HTTP server tests verifying:
+  - 3-second timeout handling.
+  - 2 retries with 500ms delay.
+  - Circuit breaker opening after 3 consecutive failures and resetting after duration.
+  - Fallback triggering when circuit is open or service unavailable.
+
+#### [NEW] [RerankingOrchestratorTest.java](file:///e:/agent/src/test/java/com/medisense/rag/reranking/RerankingOrchestratorTest.java)
+- Tests verifying score mapping by `chunk_id`, top-k selection, and RRF fallback flag (`is_reranked=false`).
+
+## Verification Plan
+
+### Automated Tests
+- Run `mvn test -Dtest=RerankingClientTest,RerankingOrchestratorTest` to verify retry, circuit breaker, fallback, and score mapping.
+- Run full Maven build: `mvn clean test` to ensure zero compilation or regression errors.

@@ -1,0 +1,165 @@
+# MediSense Frontend — Implementation Plan
+
+## Overview
+Scaffold a production-grade React 18 + TypeScript frontend at `e:\agent\frontend\` that covers:
+- **Phase 1**: Project scaffolding (package.json, Vite, Tailwind, i18n, ESLint/Prettier, Vitest, App.tsx router)
+- **Phase 2**: API layer (types.ts, client.ts, auth.ts, reports.ts, queries.ts, claims.ts)
+- **Phase 3**: Zustand stores (authStore, rateLimitStore, sessionStore, languageStore)
+- **Phase 4**: Auth pages + components (Login, Register, ProtectedRoute, RateLimitBanner, authStore, useTokenRefresh)
+- **Phase 5**: Report upload components (ReportUpload, ValueConfirmation, ReportValues, ABHAConnect, ConsentStatus, ReportPage, useRateLimit)
+- **Phase 6**: Unit tests for all above
+
+> [!IMPORTANT]
+> The frontend lives at `e:\agent\frontend\` as a standalone Vite project (not inside the Spring Boot src tree).
+
+---
+
+## Phase 1 — Project Scaffolding
+
+### [NEW] `e:\agent\frontend\package.json`
+All deps: React 18, TypeScript 5, Vite 5, TanStack Query v5, Zustand 4, React Router v6, Axios, Tailwind CSS 3, shadcn/ui (Radix primitives), React Hook Form 7, Zod, Framer Motion, React Dropzone, i18next, Vitest, React Testing Library, ESLint, Prettier.
+
+### [NEW] `e:\agent\frontend\vite.config.ts`
+- Path aliases: `@/` → `src/`
+- Dev proxy: `/api` → `http://localhost:8080`
+- TypeScript strict mode
+
+### [NEW] `e:\agent\frontend\tailwind.config.ts`
+MediSense design tokens:
+- `primary`: teal-blue (#0d9488 / teal-600 family)
+- `safe`: green (#16a34a)
+- `borderline`: amber (#d97706)
+- `abnormal`: red (#dc2626)
+- `surface`: slate dark backgrounds for glassmorphism
+
+### [NEW] `e:\agent\frontend\src\i18n\en.json` + `ta.json`
+All UI strings, error messages, disclaimers, referral messages, rate-limit messages. Tamil strings marked `[NEEDS_REVIEW]`.
+
+### [NEW] `e:\agent\frontend\src\App.tsx`
+React Router v6 routes:
+- Public: `/login`, `/register`
+- Protected (ProtectedRoute): `/dashboard`, `/report`, `/query`, `/claims`, `/history`
+- Admin (AdminRoute): `/admin/eval`, `/admin/audit`
+
+### [NEW] `e:\agent\frontend\.eslintrc.cjs` + `prettier.config.cjs`
+### [NEW] `e:\agent\frontend\vitest.config.ts`
+### [NEW] `e:\agent\frontend\tsconfig.json`
+### [NEW] `e:\agent\frontend\index.html`
+
+---
+
+## Phase 2 — API Layer
+
+### [NEW] `src/api/types.ts`
+Exact TypeScript mirrors of backend Java DTOs:
+- `AuthRequest`, `RegisterRequest`, `AuthResponse`, `RegisterResponse`
+- `LabValue` (from LabReportDto), `Prescription` (from PrescriptionDto)
+- `ReportUploadResponse`, `AbdmPullRequest/Response`, `ConfirmValueRequest/Response`
+- `QueryRequest`, `QueryResponse`, `Citation`
+- `ClaimRequest`, `ClaimResponse`, `ClaimAssessment`, `Position`
+- `EvalRunResponse`, `EvalMetrics`, `EvalRunSummary`, `EvalHistoryResponse`, `EvalFailuresResponse`
+- `ApiError` (matches GlobalExceptionHandler shape: `error_code`, `message`, `retry_after_seconds`, `limit`, `window`, `timestamp`)
+- `RateLimitInfo` (extracted from 429 response headers + body)
+
+### [NEW] `src/api/client.ts`
+- Axios instance with `baseURL: import.meta.env.VITE_API_BASE_URL`
+- Request interceptor: attach `Authorization: Bearer <token>` from authStore
+- Response interceptor:
+  - 401 → attempt refresh once, retry, on second 401: logout + redirect `/login`
+  - 429 → parse headers (`X-RateLimit-*`, `Retry-After`) + body, store in rateLimitStore, throw enriched error
+  - 503 → emit toast "Service temporarily unavailable"
+
+### [NEW] `src/api/auth.ts`, `reports.ts`, `queries.ts`, `claims.ts`
+Thin functions wrapping apiClient calls.
+
+---
+
+## Phase 3 — Zustand Stores
+
+### [NEW] `src/store/authStore.ts`
+State: `user | null`, `access_token | null`, `refresh_token | null`, `is_authenticated`, `failed_login_attempts`
+Actions: `login()`, `logout()`, `refreshToken()`, `setLanguagePref()`
+Token strategy: access_token in-memory only; refresh via httpOnly cookie on page reload.
+
+### [NEW] `src/store/rateLimitStore.ts`
+State: `Map<endpoint_slug, RateLimitInfo>`
+Actions: `setRateLimit(endpoint, info)`, `clearRateLimit(endpoint)`, `getRateLimit(endpoint)`
+
+### [NEW] `src/store/sessionStore.ts`
+State: `session_id`, `report_loaded`, `lab_values[]`, `prescriptions[]`
+
+### [NEW] `src/store/languageStore.ts`
+State: `language: 'en' | 'ta'`
+Actions: `setLanguage()`
+
+---
+
+## Phase 4 — Authentication
+
+### [NEW] `src/store/authStore.ts` (complete impl)
+### [NEW] `src/hooks/useTokenRefresh.ts`
+Decodes JWT exp claim, schedules refresh 2 min before expiry using `setTimeout`.
+
+### [NEW] `src/pages/auth/Login.tsx`
+- React Hook Form + Zod validation
+- States: default, loading, error, account-locked, rate-limited
+- Framer Motion entrance animation
+
+### [NEW] `src/pages/auth/Register.tsx`
+- Debounced email uniqueness check (300ms)
+- Password strength meter
+- Language toggle (en/ta)
+- States: default, checking-email, email-taken, rate-limited, success
+
+### [NEW] `src/components/common/ProtectedRoute.tsx`
+Reads `is_authenticated` from authStore. Attempts `refreshToken()` before redirecting.
+
+### [NEW] `src/components/common/RateLimitBanner.tsx`
+Live countdown (1-second `setInterval`). Auto-dismisses at 0. Re-enables parent form via callback prop.
+
+---
+
+## Phase 5 — Report Upload Components
+
+### [NEW] `src/hooks/useRateLimit.ts`
+Reads rateLimitStore. Returns `{ remaining, reset_at, is_limited, countdown }`. Countdown via `setInterval`.
+
+### [NEW] `src/components/report/ReportUpload.tsx`
+React Dropzone: PDF only, 10MB max. States: idle, drag-active, file-selected, uploading, success, error variants. Report type toggle. Pre-upload quota check.
+
+### [NEW] `src/components/report/ValueConfirmation.tsx`
+For each low-confidence value: confirm or edit mode. Numeric input + unit selector. Calls `POST /reports/confirm-value` per value.
+
+### [NEW] `src/components/report/ReportValues.tsx`
+Table view for lab values (status badges). Card view for prescriptions. "Ask about this →" pre-fills QueryInput.
+
+### [NEW] `src/components/abdm/ABHAConnect.tsx`
+3-step flow: ABHA address → date range → record type selector. Submits `POST /reports/abdm-pull`.
+
+### [NEW] `src/components/abdm/ConsentStatus.tsx`
+Polling with 10-second minimum interval, 5-minute timeout. Transitions to ReportValues on success.
+
+### [NEW] `src/pages/dashboard/ReportPage.tsx`
+Split 40/60 layout. Left: upload toggle. Right: empty state or ReportValues.
+
+---
+
+## Phase 6 — Unit Tests
+
+### Tests to implement (Vitest + RTL):
+- `ReportUpload.test.tsx`: file type rejection, file size rejection, rate limit UI
+- `ValueConfirmation.test.tsx`: confirm flow, edit flow
+- `ConsentStatus.test.tsx`: polling timeout
+- `authStore.test.ts`: login/logout/refresh actions
+- `Login.test.tsx`: form validation, account-locked state, rate-limited state
+- `Register.test.tsx`: form validation, email-taken state
+- `RateLimitBanner.test.tsx`: countdown behavior
+- `ProtectedRoute.test.tsx`: redirect behavior
+
+---
+
+## Verification Plan
+- `npm run build` inside `frontend/` compiles without TypeScript errors
+- `npm run lint` passes
+- `npm run test` — all unit tests green
+- Dev server starts: `npm run dev` proxies `/api` to `:8080`

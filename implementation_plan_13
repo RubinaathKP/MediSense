@@ -1,0 +1,88 @@
+# Implementation Plan: MediSense Audit Logging & Abuse Detection System
+
+Build the complete, privacy-guarded audit logging system and automated abuse detection pipeline in `com.medisense.audit`, featuring 35 distinct `AuditEvent` types, append-only PostgreSQL storage, SHA256 query text hashing, `@Async` non-blocking execution, Redis Dead Letter Queue (DLQ) retry processing, automated pattern-based abuse detection, and feedback into `RateLimitFilter`.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Audit Logging Architecture & Security Constraints**:
+> - **35 `AuditEvent` Types**: Covers full lifecycle from auth (`AUTH_LOGIN_SUCCESS`, `AUTH_ACCOUNT_LOCKED`) to RAG (`QUERY_CLASSIFIED_PRESCRIPTIVE`, `CITATION_VERIFICATION_PASSED`) and translation (`TRANSLATION_INTEGRITY_FAILED`).
+> - **Append-Only Database Rules**: Enforced via PostgreSQL rules `no_update_audit` and `no_delete_audit` on `audit_log` table.
+> - **Privacy Enforcement**: Query texts stored ONLY as SHA256 hashes (`query_text_hash`). Drug names and lab values strictly stripped from `event_detail`.
+> - **Non-Blocking Execution & Resilience**: `@Async` thread pool writes. Failed DB writes push to Redis list `audit:dlq` and log ERROR alerts. `DlqRetryJob` retries DLQ items every 5 minutes.
+> - **Abuse Detection & Throttling**: `@Scheduled` `AbuseDetectionJob` flags abusive users (>10 prescriptive attempts/hr) for 24h and abusive IPs (>50 rate limit breaches/hr) for 1h in Redis. `RateLimitFilter` checks flags and cuts tier limits by 50%.
+
+## Proposed Changes
+
+---
+
+### Database Schema Migration & Persistence
+
+#### [NEW] [V7__create_audit_log_append_only.sql](file:///e:/agent/src/main/resources/db/migration/V7__create_audit_log_append_only.sql)
+- Migration creating `audit_log` table, indices on `created_at`, `event_type`, `user_id`, `ip_address`, and `no_update_audit` / `no_delete_audit` database rules.
+
+#### [NEW] [AuditLogEntity.java](file:///e:/agent/src/main/java/com/medisense/domain/entity/AuditLogEntity.java) & [AuditLogRepository.java](file:///e:/agent/src/main/java/com/medisense/domain/repository/AuditLogRepository.java)
+- JPA entity mapping `audit_log` table with JSONB details and repository queries for pagination & abuse detection.
+
+---
+
+### Core Audit Models & Services (`com.medisense.audit`)
+
+#### [NEW] [AuditEvent.java](file:///e:/agent/src/main/java/com/medisense/audit/AuditEvent.java)
+- Enum with all 35 required audit event constants.
+
+#### [NEW] [Severity.java](file:///e:/agent/src/main/java/com/medisense/audit/Severity.java)
+- Enum: `INFO`, `WARN`, `ERROR`, `CRITICAL`.
+
+#### [NEW] [AuditEventBuilder.java](file:///e:/agent/src/main/java/com/medisense/audit/AuditEventBuilder.java)
+- Fluent builder for creating audit entries with automatic SHA256 query hashing and detail sanitization.
+
+#### [NEW] [AsyncAuditConfig.java](file:///e:/agent/src/main/java/com/medisense/audit/AsyncAuditConfig.java)
+- `@EnableAsync` and `@EnableScheduling` Spring configuration creating dedicated `auditTaskExecutor` thread pool.
+
+#### [NEW] [AuditLogService.java](file:///e:/agent/src/main/java/com/medisense/audit/AuditLogService.java)
+- Service with `@Async("auditTaskExecutor")` `log(AuditEventBuilder builder)` writing to `AuditLogEntity`. Fallback pushes failed payloads to Redis list `audit:dlq`.
+
+#### [NEW] [DlqRetryJob.java](file:///e:/agent/src/main/java/com/medisense/audit/DlqRetryJob.java)
+- `@Scheduled(fixedDelay = 300000)` job popping items from `audit:dlq` and retrying database insertion.
+
+---
+
+### Abuse Detection & Rate Limiting Integration
+
+#### [NEW] [AbuseDetectionJob.java](file:///e:/agent/src/main/java/com/medisense/audit/AbuseDetectionJob.java)
+- `@Scheduled(fixedRate = 900000)` job querying `audit_log` for:
+  - Same `user_id` with > 10 `QUERY_CLASSIFIED_PRESCRIPTIVE` events in 1h -> flags Redis key `abuse:flag:{user_id}` (TTL 24h) + logs CRITICAL audit event.
+  - Same IP with > 50 `RATE_LIMIT_EXCEEDED` events in 1h -> flags Redis key `abuse:ip:{ip}` (TTL 1h) + logs CRITICAL audit event.
+
+#### [MODIFY] [RateLimitFilter.java](file:///e:/agent/src/main/java/com/medisense/api/ratelimit/RateLimitFilter.java)
+- Check Redis keys `abuse:flag:{user_id}` and `abuse:ip:{ip}`. If present, cut `capacity` allowance by 50%.
+
+---
+
+### Admin Audit Query API (`com.medisense.audit.controller`)
+
+#### [NEW] [AuditQueryService.java](file:///e:/agent/src/main/java/com/medisense/audit/AuditQueryService.java) & [AuditController.java](file:///e:/agent/src/main/java/com/medisense/audit/controller/AuditController.java)
+- `GET /internal/audit/events`: Paginated query by event_type, user_id, date_from, date_to, severity.
+- `GET /internal/audit/security-events`: All WARN & CRITICAL events from last 24h.
+
+---
+
+### Unit & Integration Test Suite
+
+#### [NEW] [com.medisense.audit.test](file:///e:/agent/src/test/java/com/medisense/audit)
+- `AuditLogServiceTest.java`: Async write success, DLQ fallback on DB failure.
+- `DlqRetryJobTest.java`: DLQ item popping and retry persistence.
+- `AbuseDetectionJobTest.java`: Pattern recognition for user prescriptive abuse and IP rate limit abuse.
+- `AuditAppendOnlyDbTest.java`: Verifies DB update/delete prevention rules.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Execute full Maven test suite:
+  ```powershell
+  $env:JAVA_HOME="C:\Program Files\Java\jdk-21.0.12.1"; & "C:\Users\HP\AppData\Roaming\JetBrains\IdeaIC2025.1\plugins\maven\lib\maven3\bin\mvn.cmd" clean test
+  ```
+- Verify 100% passing tests across audit logging, async execution, DLQ retry, abuse detection, and rate limiting feedback.

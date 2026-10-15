@@ -1,0 +1,110 @@
+# Implementation Plan: MediSense Production-Grade REST API Layer & Rate Limiting
+
+Build the complete production-grade REST API layer in `com.medisense.api` featuring Bucket4j + Redis distributed rate limiting across 5 Tiers, JWT authentication & token blacklisting, BCrypt account lockout protection, typed exception handling, OpenAPI/Swagger annotations, and comprehensive unit & integration test coverage.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **REST API & Distributed Rate Limiting Architecture**:
+> - **5 TIER Distributed Rate Limiting (Bucket4j + Redis)**:
+>   - **TIER 1 (Auth)**: `/auth/register` (5/hr/IP), `/auth/login` (10/hr/IP), `/auth/refresh` (30/hr/user)
+>   - **TIER 2 (Report Ingestion)**: `/reports/upload` (10/hr/user), `/reports/abdm-pull` (5/hr/user), `/reports/confirm-value` (30/hr/user)
+>   - **TIER 3 (Query & Verification)**: `/query` (30/hr/user), `/claims/verify` (20/hr/user)
+>   - **TIER 4 (Read Endpoints)**: `/query/{id}` (100/hr/user), `/session/{id}/history` (60/hr/user)
+>   - **TIER 5 (Admin & Internal)**: `/internal/eval/run` (3/hr/adminKey), `/internal/eval/results/*` (60/hr/adminKey)
+> - **Response Headers & 429 Payload**:
+>   - `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
+>   - Standardized 429 JSON response payload with `retry_after_seconds`, `limit`, and `window`.
+> - **Authentication & Security**:
+>   - JWT Access (15m) & Refresh Tokens (7d) using JJWT `0.12.6`.
+>   - Redis Token Blacklisting for `/auth/logout`.
+>   - BCrypt password validation with automatic account lockout after 5 consecutive failed attempts.
+>   - Admin API key enforcement via `X-Admin-Key` header for `/internal/**`.
+
+## Proposed Changes
+
+---
+
+### Dependencies & Database Schema Migration
+
+#### [MODIFY] [pom.xml](file:///e:/agent/pom.xml)
+- Add JJWT libraries (`jjwt-api`, `jjwt-impl`, `jjwt-jackson` version `0.12.6`).
+- Add SpringDoc OpenAPI starter (`springdoc-openapi-starter-webmvc-ui` version `2.6.0`).
+
+#### [NEW] [V6__add_user_auth_fields.sql](file:///e:/agent/src/main/resources/db/migration/V6__add_user_auth_fields.sql)
+- Migration to add `failed_attempts` (INT DEFAULT 0) and `locked_until` (TIMESTAMP WITH TIME ZONE) to `users` table.
+
+#### [MODIFY] [UserEntity.java](file:///e:/agent/src/main/java/com/medisense/domain/entity/UserEntity.java)
+- Add `failedAttempts` and `lockedUntil` fields with getters, setters, and builder updates.
+
+---
+
+### DTOs, Custom Exceptions & Global Exception Handler
+
+#### [NEW] [com.medisense.api.dto](file:///e:/agent/src/main/java/com/medisense/api/dto)
+- `AuthDtos`: `RegisterRequest`, `RegisterResponse`, `LoginRequest`, `AuthResponse`, `RefreshTokenRequest`, `LogoutResponse`.
+- `ReportDtos`: `ReportUploadResponse`, `AbdmPullRequest`, `AbdmPullResponse`, `ConfirmValueRequest`, `ConfirmValueResponse`, `SessionReportDetailsResponse`.
+- `QueryDtos`: `QueryRequest`, `QueryResponse`, `CitationDto`.
+- `ClaimDtos`: `ClaimRequest`, `ClaimResponse`, `ClaimAssessmentDto`, `PositionDto`.
+- `EvalDtos`: `EvalRunResponse`, `EvalLatestResultsResponse`, `EvalHistoryResponse`, `EvalFailuresResponse`.
+- `ErrorResponse`: Standardized JSON error response object.
+
+#### [NEW] [com.medisense.api.exception](file:///e:/agent/src/main/java/com/medisense/api/exception)
+- Custom exceptions: `RateLimitExceededException`, `FileTooLargeException`, `InvalidFileTypeException`, `DocumentQualityException`, `PrescriptiveContentException`, `ConsentExpiredException`, `SessionNotFoundException`.
+
+#### [MODIFY] [GlobalExceptionHandler.java](file:///e:/agent/src/main/java/com/medisense/api/GlobalExceptionHandler.java)
+- Full exception mapping for `DocumentQualityException`, `PrescriptiveContentException`, `TranslationIntegrityException`, `HallucinatedCitationException`, `ABDMGatewayException`, `LLMProviderException`, `ConsentExpiredException`, `SessionNotFoundException`, `RateLimitExceededException`, `FileTooLargeException`, `InvalidFileTypeException`.
+
+---
+
+### Distributed Rate Limiting & Security Layer
+
+#### [NEW] [com.medisense.api.ratelimit](file:///e:/agent/src/main/java/com/medisense/api/ratelimit)
+- `RateLimitTier`: Enum defining Tier 1 through Tier 5 parameters (limit, window, slug, identification strategy).
+- `RateLimitConfig.java`: Configures Bucket4j bucket specifications per tier.
+- `RateLimitService.java`: Manages Redis-backed Bucket4j tokens (`rate:{endpoint_slug}:{identifier}`) with in-memory fallback.
+- `RateLimitFilter.java`: `OncePerRequestFilter` resolving endpoints, consuming tokens, populating `X-RateLimit-*` and `Retry-After` headers, and returning 429 JSON on limit failure.
+
+#### [NEW] [com.medisense.api.security](file:///e:/agent/src/main/java/com/medisense/api/security)
+- `JwtTokenProvider.java`: Generates, validates, and parses JWT access & refresh tokens.
+- `TokenBlacklistService.java`: Blacklists logged-out tokens in Redis with TTL equal to remaining lifetime.
+- `JwtAuthenticationFilter.java`: Filters incoming requests, checks token blacklist, and populates `SecurityContext`.
+- `AdminKeyFilter.java`: Validates `X-Admin-Key` header for `/internal/**` routes.
+- `SecurityConfig.java`: Configures Spring Security filter chain, CORS, CSRF disabled, password encoder.
+
+---
+
+### API Controllers
+
+#### [MODIFY/NEW] [com.medisense.api.controller](file:///e:/agent/src/main/java/com/medisense/api/controller)
+- `AuthController.java`: Implements `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout` with OpenAPI annotations.
+- `ReportController.java`: Implements `/reports/upload`, `/reports/abdm-pull`, `/reports/{session_id}`, `/reports/confirm-value` with PDF validation, sanitization, and OCR confidence checks.
+- `QueryController.java`: Implements `POST /query`, `GET /query/{id}`, `GET /session/{id}/history`.
+- `ClaimController.java`: Implements `POST /claims/verify`.
+- `EvalController.java`: Refactored under `/internal/eval/*` with admin key security and rate limiting.
+
+---
+
+### Unit & Integration Test Suite
+
+#### [NEW] [com.medisense.api.test](file:///e:/agent/src/test/java/com/medisense/api)
+- `AuthControllerTest.java`: Happy path, rate limit exceeded (429), bad credentials, account lockout after 5 failures.
+- `ReportControllerTest.java`: Upload validation, file size limit (>10MB), non-PDF rejection, OCR confidence low.
+- `QueryControllerTest.java`: Safe query execution, flagged prescriptive query referral, 500-char query limit validation.
+- `ClaimControllerTest.java`: Claim verification formatting and position breakdown.
+- `RateLimitFilterTest.java`: Distributed rate limit header generation and 429 response verification across tiers.
+- `QueryFlowIntegrationTest.java`: End-to-end flow from `POST /query` to response delivery under Spring Security & rate limiting.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Execute full Maven build:
+  ```powershell
+  $env:JAVA_HOME="C:\Program Files\Java\jdk-21.0.12.1"; & "C:\Users\HP\AppData\Roaming\JetBrains\IdeaIC2025.1\plugins\maven\lib\maven3\bin\mvn.cmd" clean test
+  ```
+- Verify 100% passing tests across all controllers, security filters, rate limiters, and integration test flows.
+
+### Manual Verification
+- Check OpenAPI Swagger UI docs generation at `/swagger-ui/index.html`.

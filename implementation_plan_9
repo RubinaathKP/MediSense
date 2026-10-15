@@ -1,0 +1,98 @@
+# Implementation Plan: ABDM HIU Integration (Milestones M1 & M3)
+
+Build the complete ABDM (Ayushman Bharat Digital Mission) HIU integration in `com.medisense.abdm` for ABHA verification (M1) and HIU consent & health record pull (M3) against the ABDM Sandbox environment.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **ABDM Sandbox Integration Architecture**:
+> - **ABDMAuthService**: Authenticates with `POST https://dev.abdm.gov.in/gateway/v0.5/sessions`, caches 30-min access tokens in Redis (TTL = 25 mins), with in-memory fallback if Redis is unreachable.
+> - **ConsentRequestService**: Initiates HIU consent requests (`POST /v0.5/consent-requests/init`) with `CAREMGT` purpose, specified date range, and `hiTypes` (`DiagnosticReport`, `Observation`, `MedicationRequest`).
+> - **JWTSigningInterceptor**: Spring `ClientHttpRequestInterceptor` that signs outgoing gateway requests using RS256 JWT with private key from configuration.
+> - **ABDMCallbackController**: Asynchronous `@RestController` processing gateway callbacks at `/abdm/callback/consent/notify` and `/abdm/callback/health-info`, returning HTTP 202 Accepted immediately.
+> - **FhirBundleParser**: Uses HAPI FHIR R4 (`FhirContext.forR4()`) to extract `Observation`, `DiagnosticReport`, and `MedicationRequest` resources into canonical `LabReportValue` and `Prescription` schemas.
+> - **Database Migration**: Flyway script `V4__add_consent_requests_table.sql` for tracking consent requests and session mappings.
+
+## Proposed Changes
+
+---
+
+### Database Migration & Domain Layer
+
+#### [NEW] [V4__add_consent_requests_table.sql](file:///e:/agent/src/main/resources/db/migration/V4__add_consent_requests_table.sql)
+- Migration creating `consent_requests` table with `consent_request_id`, `session_id`, `patient_abha_id`, `status` (`REQUESTED`, `GRANTED`, `DENIED`, `EXPIRED`), `consent_artefact_id`, and `transaction_id`.
+
+#### [NEW] [ConsentRequestEntity.java](file:///e:/agent/src/main/java/com/medisense/domain/entity/ConsentRequestEntity.java)
+- JPA Entity mapping the `consent_requests` table.
+
+#### [NEW] [ConsentRequestRepository.java](file:///e:/agent/src/main/java/com/medisense/domain/repository/ConsentRequestRepository.java)
+- JPA Repository for querying consent requests by `consentRequestId`, `sessionId`, or `consentArtefactId`.
+
+---
+
+### ABDM Configuration & Security
+
+#### [NEW] [FhirConfig.java](file:///e:/agent/src/main/java/com/medisense/abdm/config/FhirConfig.java)
+- Spring configuration bean initializing `FhirContext.forR4()` once at application startup.
+
+#### [NEW] [JWTSigningInterceptor.java](file:///e:/agent/src/main/java/com/medisense/abdm/security/JWTSigningInterceptor.java)
+- `ClientHttpRequestInterceptor` for `RestTemplate` that signs requests using RS256 with private key and appends `Authorization: Bearer <token>`, `X-CM-ID`, `REQUEST-ID`, and `TIMESTAMP` headers.
+
+---
+
+### ABDM Core Services (`com.medisense.abdm.service` / `com.medisense.abdm`)
+
+#### [NEW / MODIFY] [AbdmAuthService.java](file:///e:/agent/src/main/java/com/medisense/abdm/AbdmAuthService.java)
+- Implements ABDM gateway session auth (`/v0.5/sessions`).
+- Integrates Redis token caching (`StringRedisTemplate`, TTL = 25 minutes) with in-memory fallback.
+
+#### [NEW / MODIFY] [ConsentRequestService.java](file:///e:/agent/src/main/java/com/medisense/abdm/ConsentRequestService.java)
+- Builds consent request payload for ABDM `/v0.5/consent-requests/init`.
+- Persists request mapping (`consent_request_id` -> `session_id`) to database.
+
+#### [NEW] [AbdmDataDecryptor.java](file:///e:/agent/src/main/java/com/medisense/abdm/AbdmDataDecryptor.java)
+- Decrypts ABDM encrypted health data payload (ECDH key exchange + AES-GCM decryption) with sandbox raw payload fallback.
+
+#### [NEW] [HealthRecordFetchService.java](file:///e:/agent/src/main/java/com/medisense/abdm/HealthRecordFetchService.java)
+- Sends data request (`/v0.5/health-information/cm/request`) upon receiving consent approval notification.
+
+---
+
+### FHIR Parser & Canonical Mapping (`com.medisense.abdm.parser`)
+
+#### [NEW] [FhirBundleParser.java](file:///e:/agent/src/main/java/com/medisense/abdm/parser/FhirBundleParser.java)
+- Uses HAPI FHIR R4 to parse FHIR Bundles:
+  - **Observation**: extracts test name (`code.text`/`display`), value (`valueQuantity.value`), unit (`valueQuantity.unit`), reference range (`low`/`high`), interpretation (`N`/`L`/`H` -> `NORMAL`/`BORDERLINE`/`ABNORMAL`).
+  - **MedicationRequest**: extracts drug name (`medicationCodeableConcept.text`/`display`), dosage instruction (`dosageInstruction[0].text`), timing, duration (`dispenseRequest.expectedSupplyDuration`).
+  - **DiagnosticReport**: extracts linked lab observations.
+
+---
+
+### Async Callback Controller (`com.medisense.abdm.controller`)
+
+#### [NEW / MODIFY] [AbdmCallbackController.java](file:///e:/agent/src/main/java/com/medisense/abdm/AbdmCallbackController.java)
+- REST controller with async processing:
+  - `POST /abdm/callback/consent/notify`: processes consent grant/deny. Immediately returns HTTP 202 Accepted. If GRANTED -> triggers `HealthRecordFetchService`. If DENIED -> updates status and notifies user to use PDF upload.
+  - `POST /abdm/callback/health-info`: processes encrypted health record callback. Decrypts payload, parses FHIR bundle via `FhirBundleParser`, persists extracted `LabReportValue` and `Prescription` records, and returns HTTP 202 Accepted.
+
+---
+
+### Automated Tests (`src/test/java/com/medisense/abdm/`)
+
+#### [NEW] [AbdmAuthServiceTest.java](file:///e:/agent/src/test/java/com/medisense/abdm/AbdmAuthServiceTest.java)
+- Tests auth token fetch, Redis caching, and TTL refresh/fallback.
+
+#### [NEW] [ConsentRequestServiceTest.java](file:///e:/agent/src/test/java/com/medisense/abdm/ConsentRequestServiceTest.java)
+- Tests consent payload structure generation and DB persistence.
+
+#### [NEW] [FhirBundleParserTest.java](file:///e:/agent/src/test/java/com/medisense/abdm/FhirBundleParserTest.java)
+- Tests FHIR R4 Bundle parsing for `Observation`, `DiagnosticReport`, and `MedicationRequest` into canonical domain schemas.
+
+#### [NEW] [AbdmCallbackControllerTest.java](file:///e:/agent/src/test/java/com/medisense/abdm/AbdmCallbackControllerTest.java)
+- Tests async 202 Accepted callbacks, consent grant/deny routing, and health info processing.
+
+## Verification Plan
+
+### Automated Tests
+- Run `mvn test "-Dtest=AbdmAuthServiceTest,ConsentRequestServiceTest,FhirBundleParserTest,AbdmCallbackControllerTest"`
+- Run full Maven build (`mvn test`) to ensure 100% test pass rate across all 80+ backend tests.

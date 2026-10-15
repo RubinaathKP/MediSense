@@ -1,0 +1,105 @@
+safety_patterns:
+  version: "1.0"
+  last_updated: "2026-08"
+  
+  prescriptive:
+    exact_phrases:
+      - "what dose should i take"
+      - "what dosage should i take"
+      - "how much should i take"
+      - "should i take metformin"
+      - "can i stop taking my medicine"
+      - "what if i miss a dose"
+      - "can i take less"
+      - "is this dose too high"
+      - "which medicine is better"
+      - "is this the right medicine for me"
+
+    regex_patterns:
+      - "should i take"
+      - "what dose"
+      - "what dosage"
+      - "how many (mg|tablets|pills|capsules|ml) should i take"
+      - "can i stop taking"
+      - "what if i miss a dose"
+      - "can i take less"
+      - "is this dose too high"
+      - "which (medicine|drug) is better"
+      - "is this the right medicine"
+
+    drug_directives:
+      verbs:
+        - "take"
+        - "stop"
+        - "increase"
+        - "decrease"
+        - "substitute"
+        - "prescribe"
+        - "recommend"
+        - "dosage"
+        - "dose"
+      drug_names:
+        - "metformin"
+        - "atorvastatin"
+        - "amlodipine"
+        - "losartan"
+        - "lisinopril"
+        - "aspirin"
+        - "paracetamol"
+        - "ibuprofen"
+        - "insulin"
+        - "glimepiride"
+        - "telmisartan"
+        - "hydroxychloroquine"
+        - "azithromycin"
+
+  diagnostic:
+    exact_phrases:
+      - "do i have diabetes"
+      - "do i have hypertension"
+      - "does this mean i have cancer"
+
+    regex_patterns:
+      - "do i have"
+      - "does this.*mean i have"
+      - "mean i have"
+      - "am i suffering from"
+      - "is it possible i have"
+
+  drug_interaction:
+    exact_phrases:
+      - "can i take these two drugs together"
+      - "does this interact with"
+
+    regex_patterns:
+      - "interacts? with"
+      - "drug interaction"
+      - "can i take .* with"
+      - "is it safe to combine"
+
+  treatment_substitution:
+    exact_phrases:
+      - "can i substitute this drug"
+      - "can i replace my prescription"
+
+    regex_patterns:
+      - "can i substitute"
+      - "can i replace"
+      - "substitute"
+      - "alternative to"
+      - "instead of taking"
+
+  emergency:
+    exact_phrases:
+      - "i am having chest pain"
+      - "i cannot breathe"
+      - "severe shortness of breath"
+
+    regex_patterns:
+      - "chest pain"
+      - "shortness of breath"
+      - "loss of consciousness"
+      - "unconscious"
+      - "severe bleeding"
+      - "stroke symptoms"
+      - "paralysis"

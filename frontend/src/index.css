@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  body {
+    @apply bg-surface-900 text-slate-200 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Tamil language font override */
+  :lang(ta) {
+    font-family: 'Noto Sans Tamil', 'Inter', system-ui, sans-serif;
+  }
+
+  /* Smooth scrollbars */
+  ::-webkit-scrollbar {
+    @apply w-1.5 h-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-surface-700;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-600;
+  }
+
+  /* Focus rings */
+  :focus-visible {
+    @apply outline outline-2 outline-primary-500 outline-offset-2;
+  }
+
+  /* Date input styling */
+  input[type='date']::-webkit-calendar-picker-indicator {
+    filter: invert(0.6);
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  /* Glassmorphic card base */
+  .glass-card {
+    @apply rounded-2xl border border-surface-700/50 bg-surface-800/60 shadow-glass backdrop-blur-sm;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply flex items-center justify-center gap-2 rounded-xl bg-gradient-primary px-5 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply flex items-center justify-center gap-2 rounded-xl border border-surface-700 px-5 py-2.5 text-sm font-medium text-surface-600 transition hover:border-primary-500 hover:text-slate-300;
+  }
+
+  /* Form input base */
+  .input-base {
+    @apply w-full rounded-xl border border-surface-700 bg-surface-900/50 px-4 py-2.5 text-sm text-white placeholder-surface-600 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 disabled:opacity-50;
+  }
+}

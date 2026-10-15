@@ -1,0 +1,54 @@
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: medisense-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: medisense_db
+      POSTGRES_USER: medisense_user
+      POSTGRES_PASSWORD: medisense_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medisense_user -d medisense_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: medisense-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  reranker-service:
+    build:
+      context: ./reranker-service
+      dockerfile: Dockerfile
+    container_name: medisense-reranker
+    restart: always
+    ports:
+      - "8001:8001"
+    environment:
+      - RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
+

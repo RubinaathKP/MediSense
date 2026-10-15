@@ -1,0 +1,76 @@
+# Implementation Plan — Hybrid Dense + Sparse Retrieval System
+
+This implementation plan details the architecture and components required to build the hybrid retrieval system in `com.medisense.rag.retrieval`.
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **HyDE (Hypothetical Document Embeddings)**: Uses Gemini Flash to generate a hypothetical clinical guideline sentence before embedding, with a robust fallback to direct query embedding if the LLM call fails.
+> - **Dense pgvector Retrieval**: Cosine similarity search (`<=>`) over 768-dim embeddings with metadata pre-filtering (`is_active = TRUE`, `evidence_basis`, `domain_tags`).
+> - **Sparse Lucene BM25 Retrieval**: Local `FSDirectory` BM25 search over active child chunks with score normalization to $[0, 1]$.
+> - **Reciprocal Rank Fusion (RRF)**: Merges dense top-20 and sparse top-20 using $\text{score} = \frac{1}{60 + \text{dense\_rank}} + \frac{1}{60 + \text{sparse\_rank}}$ (missing rank default: 21).
+> - **Parallel Execution**: `RetrievalOrchestrator` executes dense and sparse searches concurrently via `CompletableFuture`.
+> - **Parent Chunk Fetcher**: Retrieves full section-level parent context for the top-selected child chunks.
+
+---
+
+## Proposed Changes
+
+### Component 1: Domain Models & Records
+
+#### [NEW] [ScoredChunk.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/model/ScoredChunk.java)
+- Record wrapping `ChildChunkEntity` (or `ChildChunk`), `chunkId`, `score`, `rank`, `source`.
+
+#### [NEW] [HyDEExpansionResult.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/model/HyDEExpansionResult.java)
+- Record storing `originalQuery`, `originalQueryEmbedding`, `hypotheticalAnswer`, `hydeEmbedding`.
+
+#### [NEW] [RetrievedContext.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/model/RetrievedContext.java)
+- Record containing `parentChunkText`, `sourceName`, `sourceYear`, `evidenceBasis`, `sectionHeading`, `triggeredChildChunkIds`.
+
+---
+
+### Component 2: Query Expansion & Retrieval Engines (`com.medisense.rag.retrieval`)
+
+#### [NEW] [HyDEQueryExpander.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/HyDEQueryExpander.java)
+- Gemini Flash hypothetical answer generator prompt.
+- Fallback to direct query embedding if LLM is unavailable or fails.
+
+#### [MODIFY] [DenseRetriever.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/DenseRetriever.java)
+- Execute `pgvector` cosine similarity search with parameterized metadata pre-filtering (`is_active = TRUE`, `evidence_basis`, `domain_tags`).
+
+#### [MODIFY] [SparseBm25Retriever.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/SparseBm25Retriever.java)
+- Execute Lucene BM25 keyword search over local `FSDirectory` index.
+- Normalize raw BM25 Lucene scores to $[0, 1]$.
+
+#### [NEW] [RRFRanker.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/RRFRanker.java)
+- Implement RRF formula: $\text{score}(c) = \frac{1}{60 + r_{\text{dense}}} + \frac{1}{60 + r_{\text{sparse}}}$.
+- Handle deduplication by `chunkId` and sort descending.
+
+#### [NEW] [ParentChunkFetcher.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/ParentChunkFetcher.java)
+- Query `ParentChunkRepository` for `parent_chunk_id` of top-5 child chunks and assemble `List<RetrievedContext>`.
+
+#### [MODIFY] [HybridRetrieverService.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/HybridRetrieverService.java) & [RetrievalOrchestrator.java](file:///e:/agent/src/main/java/com/medisense/rag/retrieval/RetrievalOrchestrator.java)
+- Coordinate HyDE expansion, parallel dense + sparse retrieval (`CompletableFuture.supplyAsync`), RRF ranking, and parent context fetching.
+
+---
+
+### Component 3: Unit Test Suite
+
+#### [NEW] [RRFRankerTest.java](file:///e:/agent/src/test/java/com/medisense/rag/retrieval/RRFRankerTest.java)
+- Unit tests for RRF mathematical scoring formula and deduplication.
+
+#### [NEW] [HyDEQueryExpanderTest.java](file:///e:/agent/src/test/java/com/medisense/rag/retrieval/HyDEQueryExpanderTest.java)
+- Unit tests for HyDE expansion and fallback logic.
+
+#### [NEW] [RetrievalOrchestratorTest.java](file:///e:/agent/src/test/java/com/medisense/rag/retrieval/RetrievalOrchestratorTest.java)
+- Unit tests for parallel execution and end-to-end hybrid retrieval orchestration.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Execute full Maven unit test suite:
+  ```powershell
+  $env:JAVA_HOME="C:\Users\HP\.jdks\openjdk-24.0.1"; & "C:\Users\HP\AppData\Roaming\JetBrains\IdeaIC2025.1\plugins\maven\lib\maven3\bin\mvn.cmd" test
+  ```

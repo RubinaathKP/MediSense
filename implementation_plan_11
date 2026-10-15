@@ -1,0 +1,97 @@
+# Implementation Plan: MediSense RAG & Safety Evaluation Framework
+
+Build the complete Evaluation Framework in `com.medisense.evaluation` featuring a 100-case benchmark (`eval_set.yaml`), distributed Redis locking, rate-limited sequential test execution, 9 precision evaluation metrics, persistence via Flyway V5 schema, and Admin REST API endpoints.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Evaluation Framework Architecture & Governance**:
+> - **100-Case Benchmark Benchmark (`eval_set.yaml`)**:
+>   - 20 Lab Explanation queries (en)
+>   - 20 Prescription Explanation queries (en)
+>   - 15 Health Claim Verification queries (en)
+>   - 20 Adversarial Lab queries (en)
+>   - 15 Adversarial Prescription queries (en)
+>   - 10 Adversarial Claim queries (en)
+>   - 10 Tamil Lab Explanation queries (ta)
+>   - 5 Tanglish queries
+>   - 5 Emergency Detection queries
+> - **Concurrency & Rate Limits**: Max 1 concurrent run enforced via Redis distributed lock (`eval:lock:running`). Max 3 runs per hour per admin key (`X-Admin-Api-Key`). Bucket4j rate limiter within evaluation: 30 LLM calls per minute with a 500ms delay between cases.
+> - **9 Precision Metrics**:
+>   1. `citation_accuracy` (Target: ≥ 0.95)
+>   2. `refusal_correctness_lab` (Target: 1.00)
+>   3. `refusal_correctness_prescription` (Target: 1.00)
+>   4. `hallucination_rate` (Target: ≤ 0.02)
+>   5. `tamil_parity` (Target: ≥ 0.90)
+>   6. `drug_name_integrity` (Target: 1.00)
+>   7. `numeric_integrity` (Target: 1.00)
+>   8. `adversarial_robustness_lab` (Target: 1.00)
+>   9. `adversarial_robustness_prescription` (Target: 1.00)
+> - **Endpoints**:
+>   - `POST /internal/eval/run`
+>   - `GET /internal/eval/results/latest`
+>   - `GET /internal/eval/results/history`
+>   - `GET /internal/eval/results/{run_id}/failures`
+
+## Proposed Changes
+
+---
+
+### Benchmark Set & Database Migration
+
+#### [NEW] [eval_set.yaml](file:///e:/agent/src/main/resources/eval_set.yaml)
+- YAML resource file containing 100 test cases with `id`, `query_text`, `query_type`, `language`, `expected_classification`, `expected_is_referral`, `expected_citation_present`, and `domain`.
+
+#### [NEW] [V5__add_eval_tables.sql](file:///e:/agent/src/main/resources/db/migration/V5__add_eval_tables.sql)
+- Migration creating `eval_runs` and `eval_case_results` tables with foreign keys and JSONB metrics column.
+
+---
+
+### Domain Entities & Repositories (`com.medisense.domain`)
+
+#### [NEW] [EvalRunEntity.java](file:///e:/agent/src/main/java/com/medisense/domain/entity/EvalRunEntity.java)
+- JPA Entity mapping `eval_runs`.
+
+#### [NEW] [EvalCaseResultEntity.java](file:///e:/agent/src/main/java/com/medisense/domain/entity/EvalCaseResultEntity.java)
+- JPA Entity mapping `eval_case_results`.
+
+#### [NEW] [EvalRunRepository.java](file:///e:/agent/src/main/java/com/medisense/domain/repository/EvalRunRepository.java)
+- JPA Repository for querying evaluation runs.
+
+#### [NEW] [EvalCaseResultRepository.java](file:///e:/agent/src/main/java/com/medisense/domain/repository/EvalCaseResultRepository.java)
+- JPA Repository for querying case results and failures by `runId`.
+
+---
+
+### Core Evaluation Engine (`com.medisense.evaluation`)
+
+#### [NEW] [TestCaseDto.java](file:///e:/agent/src/main/java/com/medisense/evaluation/model/TestCaseDto.java) & [EvalMetrics.java](file:///e:/agent/src/main/java/com/medisense/evaluation/model/EvalMetrics.java)
+- DTO records for benchmark test cases and the 9 target metrics.
+
+#### [MODIFY] [EvaluationMetricsCalculator.java](file:///e:/agent/src/main/java/com/medisense/evaluation/EvaluationMetricsCalculator.java)
+- Computes all 9 target metrics from raw case execution records.
+
+#### [MODIFY] [EvaluationRunner.java](file:///e:/agent/src/main/java/com/medisense/evaluation/EvaluationRunner.java) / [NEW] [EvalSetRunner.java](file:///e:/agent/src/main/java/com/medisense/evaluation/EvalSetRunner.java)
+- Loads `eval_set.yaml`, acquires Redis lock (`eval:lock:running`), enforces Bucket4j 30 calls/min rate limiter and 500ms inter-case delay, executes test cases through safety & RAG pipelines, and invokes metric calculation.
+
+#### [NEW] [EvalResultsService.java](file:///e:/agent/src/main/java/com/medisense/evaluation/EvalResultsService.java)
+- Stores evaluation runs and case results to database, providing query methods for latest run, history, and failures.
+
+#### [NEW] [EvalController.java](file:///e:/agent/src/main/java/com/medisense/evaluation/controller/EvalController.java)
+- REST Controller exposing `/internal/eval/run`, `/internal/eval/results/latest`, `/history`, and `/{run_id}/failures`.
+
+---
+
+### Automated Tests (`src/test/java/com/medisense/evaluation/`)
+
+#### [NEW] [EvaluationMetricsCalculatorTest.java](file:///e:/agent/src/test/java/com/medisense/evaluation/EvaluationMetricsCalculatorTest.java)
+- Unit tests verifying exact computation for all 9 metrics across pass/fail scenarios.
+
+#### [NEW] [EvalSetRunnerIntegrationTest.java](file:///e:/agent/src/test/java/com/medisense/evaluation/EvalSetRunnerIntegrationTest.java)
+- Integration test executing a 10-case subset through the evaluation pipeline, verifying metrics calculation, Redis locking, and database persistence.
+
+## Verification Plan
+
+### Automated Tests
+- Run `mvn test "-Dtest=EvaluationMetricsCalculatorTest,EvalSetRunnerIntegrationTest"`
+- Run full Maven build (`mvn test`) to ensure 100% pass rate across all 110+ backend unit and integration tests.
